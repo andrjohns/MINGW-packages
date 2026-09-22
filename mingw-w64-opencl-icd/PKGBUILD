@@ -4,7 +4,7 @@ _realname=opencl-icd
 pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
 pkgver=2026.05.29
-pkgrel=1
+pkgrel=2
 pkgdesc="OpenCL ICD Loader (mingw-w64)"
 arch=('any')
 mingw_arch=('mingw64' 'ucrt64' 'clang64' 'clangarm64')
@@ -20,8 +20,17 @@ makedepends=(
   "${MINGW_PACKAGE_PREFIX}-ninja"
   "${MINGW_PACKAGE_PREFIX}-opencl-headers"
 )
-source=("https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/v${pkgver}/${_realname}-${pkgver}.tar.gz")
-sha256sums=('48fd0c5181db7cd046f4f731d5955694892e10998d49d09ee0d997e7e04fd939')
+source=("https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/v${pkgver}/${_realname}-${pkgver}.tar.gz"
+        "001-vendor-directory-on-windows.patch")
+sha256sums=('48fd0c5181db7cd046f4f731d5955694892e10998d49d09ee0d997e7e04fd939'
+            'f01b8b35ad528248e605201d5437975e1c45ee16f8524c1b1029ca3abfa7201d')
+
+prepare() {
+  cd OpenCL-ICD-Loader-${pkgver}
+
+  # Also look for ICDs in ${MINGW_PREFIX}/etc/OpenCL/vendors/*.icd
+  patch -Np1 -i "${srcdir}/001-vendor-directory-on-windows.patch"
+}
 
 build() {
   declare -a extra_config

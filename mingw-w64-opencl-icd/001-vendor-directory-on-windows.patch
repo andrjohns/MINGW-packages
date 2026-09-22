@@ -1,0 +1,92 @@
+diff --git a/loader/windows/icd_windows.c b/loader/windows/icd_windows.c
+index 9ab00e9..294d848 100644
+--- a/loader/windows/icd_windows.c
++++ b/loader/windows/icd_windows.c
+@@ -175,6 +175,76 @@ void layerFree(WinLayer *pWinLayer)
+ }
+ #endif // defined(CL_ENABLE_LAYERS)
+ 
++#ifdef __MINGW32__
++extern IMAGE_DOS_HEADER __ImageBase;
++
++static BOOL khrIcdOsVendorsEnumerateIcdFiles(void)
++{
++    BOOL status = FALSE;
++    DWORD length = 0;
++    char dir[MAX_PATH] = {0};
++    char vendors[MAX_PATH + 32] = {0};
++    char path[2 * MAX_PATH] = {0};
++    char *sep = NULL;
++    WIN32_FIND_DATAA fd;
++    HANDLE hFind = INVALID_HANDLE_VALUE;
++
++    length = GetModuleFileNameA((HMODULE)&__ImageBase, dir, sizeof(dir));
++    if (0 == length || length >= sizeof(dir) || !(sep = strrchr(dir, '\\')))
++    {
++        goto out;
++    }
++    *sep = '\0';
++
++    snprintf(vendors, sizeof(vendors), "%s\\..\\etc\\OpenCL\\vendors", dir);
++    snprintf(path, sizeof(path), "%s\\*.icd", vendors);
++    hFind = FindFirstFileA(path, &fd);
++    if (INVALID_HANDLE_VALUE == hFind)
++    {
++        goto out;
++    }
++    do
++    {
++        char line[MAX_PATH] = {0};
++        FILE *file = NULL;
++
++        snprintf(path, sizeof(path), "%s\\%s", vendors, fd.cFileName);
++        file = fopen(path, "r");
++        if (!file)
++        {
++            continue;
++        }
++        if (fgets(line, sizeof(line), file))
++        {
++            line[strcspn(line, "\r\n")] = '\0';
++        }
++        fclose(file);
++        if (!line[0])
++        {
++            continue;
++        }
++        if (line[0] == '\\' || line[0] == '/' || line[1] == ':')
++        {
++            khrIcdVendorAdd(line);
++        }
++        else
++        {
++            snprintf(path, sizeof(path), "%s\\%s", dir, line);
++            khrIcdVendorAdd(path);
++        }
++        status = TRUE;
++    } while (FindNextFileA(hFind, &fd));
++
++out:
++    if (INVALID_HANDLE_VALUE != hFind)
++    {
++        FindClose(hFind);
++    }
++
++    return status;
++}
++#endif // __MINGW32__
++
+ /*
+  *
+  * Vendor enumeration functions
+@@ -325,6 +395,10 @@ BOOL CALLBACK khrIcdOsVendorsEnumerate(PINIT_ONCE InitOnce, PVOID Parameter, PVO
+     pWinAdapterEnd = NULL;
+     pWinAdapterCapacity = NULL;
+ 
++#ifdef __MINGW32__
++    status |= khrIcdOsVendorsEnumerateIcdFiles();
++#endif
++
+     result = RegCloseKey(platformsKey);
+     if (ERROR_SUCCESS != result)
+     {
